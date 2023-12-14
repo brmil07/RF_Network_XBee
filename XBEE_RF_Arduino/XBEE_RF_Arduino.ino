@@ -15,6 +15,11 @@
 //Initialize Variables
 int Bat_Pin = 38;
 int sleep_trig = 33;
+
+float Light_Data = 0;
+float Temp_Data = 0;
+float Alti_Data = 0;
+float Pres_Data = 0;
 float Bat_Val;
 String sensor_data;
 String hexArray;
@@ -90,10 +95,10 @@ String ConvertToHexArray(String& data) {
 }
 
 String get_sensor_data() {
-  int Light_Data = TSL2561.readVisibleLux();
-  float Temp_Data = bmp.readTemperature();
-  float Alti_Data = bmp.readAltitude();
-  float Pres_Data = bmp.readPressure();
+  Light_Data = TSL2561.readVisibleLux();
+  Temp_Data = bmp.readTemperature();
+  Alti_Data = bmp.readAltitude();
+  Pres_Data = bmp.readPressure();
   String data = "Light:" + String(Light_Data)
                 + ",Temperature:" + String(Temp_Data)
                 + ",Altitude:" + String(Alti_Data)
