@@ -12,24 +12,6 @@
 #define BMP_MOSI (11)
 #define BMP_CS (10)
 
-//Ambient Sensor
-Adafruit_BMP280 bmp;
-
-SoftwareSerial SoftSerial(ssRX, ssTX);
-XBee xbee = XBee();
-XBeeResponse response = XBeeResponse();
-ZBRxResponse rx = ZBRxResponse();
-ModemStatusResponse msr = ModemStatusResponse();
-
-//ROUTER4 0013A20041BDFF8D
-//ROUTER3 0013A200418E85F0
-//ROUTER2 0013A20041BDFC1F
-//ROUTER1 0013A20041BDFD8D
-
-XBeeAddress64 addr64 = XBeeAddress64(0x0013A200, 0x41BDFF8D);
-Tx64Request tx;
-TxStatusResponse txStatus = TxStatusResponse();
-
 //Initialize Variables
 int Bat_Pin = 38;
 int sleep_trig = 33;
@@ -50,6 +32,18 @@ unsigned long previousTime2;
 unsigned long currentTime;
 unsigned long currentTime2;
 unsigned long currentTime3;
+
+//Ambient Sensor
+Adafruit_BMP280 bmp;
+
+SoftwareSerial SoftSerial(ssRX, ssTX);
+XBee xbee = XBee();
+XBeeResponse response = XBeeResponse();
+ZBRxResponse rx = ZBRxResponse();
+ModemStatusResponse msr = ModemStatusResponse();
+XBeeAddress64 addr64 = XBeeAddress64(0x0013A200, 0x41BDFF8D);
+Tx64Request tx;
+TxStatusResponse txStatus = TxStatusResponse();
 
 void sendtx(uint8_t* payload, size_t payloadSize) {
   Tx64Request tx = Tx64Request(addr64, payload, payloadSize);
