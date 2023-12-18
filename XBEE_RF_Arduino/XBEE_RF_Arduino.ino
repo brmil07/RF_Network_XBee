@@ -20,7 +20,7 @@ float Light_Data = 0;
 float Temp_Data = 0;
 float Alti_Data = 0;
 float Pres_Data = 0;
-float Bat_Val;
+float Bat_Val = 0;
 String sensor_data;
 String hexArray;
 size_t payloadSize;
@@ -97,8 +97,31 @@ String ConvertToHexArray(String& data) {
 String get_sensor_data() {
   Light_Data = TSL2561.readVisibleLux();
   Temp_Data = bmp.readTemperature();
-  Alti_Data = bmp.readAltitude();
+  Alti_Data = bmp.readAltitude(1013.25);  /* Adjusted to local forecast! */
   Pres_Data = bmp.readPressure();
+  Bat_Val = analogRead(Bat_Pin);
+  Bat_Val = (-0.0000004 * pow(Bat_Val, 3) + 0.0007 * pow(Bat_Val, 2) - 0.2017 * Bat_Val - 0.1125) + 0.11;
+
+  if (isnan(Light_Data)) {
+    Light_Data = 0;
+  }
+
+  if (isnan(Temp_Data)) {
+    Temp_Data = 0;
+  }
+
+  if (isnan(Alti_Data)) {
+    Alti_Data = 0;
+  }
+
+  if (isnan(Pres_Data)) {
+    Pres_Data = 0;
+  }
+
+  if (isnan(Bat_Val)) {
+    Bat_Val = 0;
+  }
+
   String data = "Light:" + String(Light_Data)
                 + ",Temperature:" + String(Temp_Data)
                 + ",Altitude:" + String(Alti_Data)
@@ -108,36 +131,66 @@ String get_sensor_data() {
   return data;
 }
 
-void print_sensor_data() {
+String print_sensor_data(String data) {
   currentTime2 = millis();
-  if (currentTime2 - previousTime >= 5000) {
-    Bat_Val = analogRead(Bat_Pin);
-    Bat_Val = (-0.0000004 * pow(Bat_Val, 3) + 0.0007 * pow(Bat_Val, 2) - 0.2017 * Bat_Val - 0.1125) + 0.11;
+
+  size_t startIdx = 0;
+  int endIdx;
+
+  while (startIdx < data.length()) {
+    endIdx = data.indexOf(':', startIdx);
+    String param = data.substring(startIdx, endIdx);
+
+    startIdx = endIdx + 1;
+    endIdx = data.indexOf(',', startIdx);
+    if (endIdx == -1) {
+      endIdx = data.length();
+    }
+
+    String value = data.substring(startIdx, endIdx);
+
+    if (param.equals("Light")) {
+      Light_Data = value.toFloat();
+    } else if (param.equals("Temperature")) {
+      Temp_Data = value.toFloat();
+    } else if (param.equals("Altitude")) {
+      Alti_Data = value.toFloat();
+    } else if (param.equals("Pressure")) {
+      Pres_Data = value.toFloat();
+    } else if (param.equals("Battery")) {
+      Bat_Val = value.toFloat();
+    }
+
+    startIdx = endIdx + 1;
+  }
+
+  if (currentTime2 - previousTime2 >= 5000) {
 
     Serial.print("Battery Percentage: ");
     Serial.print(Bat_Val);
     Serial.println("%");
 
     Serial.print(F("Temperature = "));
-    Serial.print(bmp.readTemperature());
+    Serial.print(Temp_Data);
     Serial.println(" *C");
 
     Serial.print(F("Pressure = "));
-    Serial.print(bmp.readPressure());
+    Serial.print(Pres_Data);
     Serial.println(" Pa");
 
     Serial.print(F("Approx altitude = "));
-    Serial.print(bmp.readAltitude(1013.25)); /* Adjusted to local forecast! */
+    Serial.print(Alti_Data);
     Serial.println(" m");
 
     Serial.print("The Light intensity is: ");
-    Serial.print(TSL2561.readVisibleLux());
+    Serial.print(Light_Data);
     Serial.println(" Lux");
-
     Serial.println();
 
     previousTime2 = currentTime2;
   }
+
+  return "";
 }
 
 void setup() {
@@ -214,5 +267,5 @@ void loop() {
     }
   }
 
-  print_sensor_data();
+  print_sensor_data(sensor_data);
 }
