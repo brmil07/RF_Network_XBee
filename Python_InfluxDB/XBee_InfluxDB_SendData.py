@@ -1,32 +1,26 @@
 from datetime import datetime
+import urllib3
+import logging
 from digi.xbee.devices import *
-
-import influxdb_client
-from influxdb_client import InfluxDBClient, Point, WritePrecision
+from influxdb_client import Point
 from influxdb_client.client.write_api import SYNCHRONOUS
+import influxdb_client
 
-# Initialize influxDB configurations
-org = "FH"
-url = "http://127.0.0.1:8086"
-token = "Wfwp8kjSQpSaGsP2ZqXB7rEqmsjtGfaj-8nr6LQzIWmr8RbWcz4S_xBbB_484MTjmM0Y8F38WGIG4ve_1ubB1g=="
-client = influxdb_client.InfluxDBClient(url=url, token=token, org=org)
-bucket = "fh_bucket"
-write_api = client.write_api(write_options=SYNCHRONOUS)
 
-# Initialize XBEE Device
-device = XBeeDevice("COM12", 115200)
-# remote = RemoteXBeeDevice(device, XBee64BitAddress.from_hex_string("0013A200418E85F0"))
-# remote = RemoteXBeeDevice(device, XBee64BitAddress.from_hex_string("0013A20041BDFF8D"))
+def establish_influxdb_connection():
+    # Establish a connection to InfluxDB
+    # Returns a tuple containing InfluxDB client and write API
+    while True:
+        try:
+            client = influxdb_client.InfluxDBClient(url=url, token=token, org=org)
+            write_api = client.write_api(write_options=SYNCHRONOUS)
+            return client, write_api
+        except urllib3.exceptions.NewConnectionError:
+            print("InfluxDB is not available. Retrying in 5 seconds...")
+            time.sleep(5)
 
-# Initialize variables
-device_id = []
 
-time.sleep(0.01)
-
-# Open serial device
-device.open()
-
-def send_data():
+def send_data(xbee_message, write_api):
     remote_num = xbee_message.remote_device
     data = xbee_message.data
     data = data.decode('utf-8')
@@ -80,14 +74,45 @@ def send_data():
     print(f"Pressure: {pressure}")
     print(f"Battery: {battery}")
 
-try:
-    while True:
-        xbee_message = device.read_data()
 
-        if xbee_message is not None:
-            send_data()
+def main():
+    # Initialize InfluxDB configurations
+    global org, url, token, bucket
+    org = "FH"
+    url = "http://127.0.0.1:8086"
+    token = "Wfwp8kjSQpSaGsP2ZqXB7rEqmsjtGfaj-8nr6LQzIWmr8RbWcz4S_xBbB_484MTjmM0Y8F38WGIG4ve_1ubB1g=="
+    bucket = "fh_bucket"
 
-except KeyboardInterrupt:
-    device.close()
-    print("Finished")
-    pass
+    # Establish InfluxDB connection
+    client, write_api = establish_influxdb_connection()
+
+    # Initialize XBEE Device
+    device = XBeeDevice("COM14", 115200)
+
+    # Open serial device
+    device.open()
+
+    try:
+        while True:
+            try:
+                xbee_message = device.read_data()
+
+                if xbee_message is not None:
+                    send_data(xbee_message, write_api)
+
+            except Exception as e:
+                print(f"An error occurred while processing XBee data: {str(e)}")
+                break
+
+    except KeyboardInterrupt:
+        print("Script terminated by user")
+        logging.info("Script terminated by user.")
+
+    finally:
+        device.close()
+        print("Script successfully terminated")
+        logging.info("Script successfully terminated")
+
+
+if __name__ == "__main__":
+    main()
