@@ -1,4 +1,4 @@
-# XBEE_RF_Arduino
+# RF Network XBee
 ---
 A wireless networking system project to send data via RF communication protocol. The code is running on Teensy 4.1 with Arduino IDE connected to XBEE SX868 RF Module to read ambient sensor data and send through XBee Module using Digimesh topology.
 
