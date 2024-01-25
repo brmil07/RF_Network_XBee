@@ -283,6 +283,36 @@ void convertSensorDataToPayload() {
   }
 }
 
+void allocatePayload() {
+  hexArray = convertToHexArray(sensor_data);
+  payloadSize = hexArray.length() / 3; // 3 characters in hexArray represent one byte
+  payload = new uint8_t[payloadSize];
+
+  for (size_t i = 0, j = 0; i < hexArray.length(); i += 3, ++j) {
+    payload[j] = strtol(hexArray.substring(i, i + 2).c_str(), NULL, 16);
+  }
+}
+
+void deallocatePayload() {
+  delete[] payload;
+}
+
+void blinkLED() {
+  Serial.println("Starting up...");
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+}
+
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(SLEEP_TRIG_PIN, OUTPUT);
@@ -301,31 +331,23 @@ void setup() {
                   Adafruit_BMP280::FILTER_X16,      /* Filtering. */
                   Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
 
-  Serial.println("Starting up...");
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(500);
-  digitalWrite(LED_BUILTIN, LOW);
-  delay(500);
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(500);
-  digitalWrite(LED_BUILTIN, LOW);
-  delay(500);
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(500);
-  digitalWrite(LED_BUILTIN, LOW);
-  delay(1000);
+  blinkLED();
 
   // Send the AT Command to reset the XBee device during the initialization
   sendAtCommand();
-  digitalWrite(LED_BUILTIN, HIGH);
   delay(3000);
+  digitalWrite(LED_BUILTIN, HIGH);
+  
+  // Allocate payload memory once during setup
+  allocatePayload();
 }
 
 void loop() {
+  // Continuously getting the sensor data and convert it into Hex format
   convertSensorDataToPayload();
   handleSleepState(payload, payloadSize);
   printSensorData(sensor_data);
 
-  // Clean up allocated memory
-  delete[] payload;
+  // Deallocate payload memory
+  deallocatePayload();
 }
