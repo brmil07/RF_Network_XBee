@@ -12,64 +12,125 @@
 #define BMP_MOSI (11)
 #define BMP_CS (10)
 
-//Initialize Variables
-int Bat_Pin = 38;
-int sleep_trig = 33;
+// Initialize Constant Variables
+const int BAT_PIN = 38;
+const int SLEEP_TRIG_PIN = 33;
+const int ON_DURATION = 10000;
+const int OFF_DURATION = 5000;
+const int SEND_TX_PERIOD = 5000;
+const int PRINT_DURATION = 5000;
 
-float Light_Data = 0;
-float Temp_Data = 0;
-float Alti_Data = 0;
-float Pres_Data = 0;
-float Bat_Val = 0;
+float lightData = 0;
+float tempData = 0;
+float altiData = 0;
+float presData = 0;
+float batData = 0;
+
 String sensor_data;
 String hexArray;
 size_t payloadSize;
-bool State = false;
-bool sendtx_flag = false;
+
+bool state = false;
+bool sendTxFlag = false;
+
 uint8_t ssRX = 0;
 uint8_t ssTX = 1;
 
-const int onDuration = 10000;
-const int offDuration = 5000;
 unsigned long previousTime;
 unsigned long previousTime2;
-
 unsigned long currentTime;
 unsigned long currentTime2;
-unsigned long currentTime3;
 
-//Ambient Sensor
+// Instantiating objects for various classes
 Adafruit_BMP280 bmp;
-
 SoftwareSerial SoftSerial(ssRX, ssTX);
 XBee xbee = XBee();
 XBeeResponse response = XBeeResponse();
 ZBRxResponse rx = ZBRxResponse();
 ModemStatusResponse msr = ModemStatusResponse();
-XBeeAddress64 addr64 = XBeeAddress64(0x0013A200, 0x41BDFF8D);
 Tx64Request tx;
 TxStatusResponse txStatus = TxStatusResponse();
 
-void sendtx(uint8_t* payload, size_t payloadSize) {
+// Set the node destination address here
+XBeeAddress64 addr64 = XBeeAddress64(0x0013A200, 0x41BDFF8D);
+
+// Set the AT Command
+uint8_t idCmd[] = { 'F', 'R' };  // AT Command 'FR' is for software reset
+AtCommandRequest atRequest = AtCommandRequest(idCmd);
+AtCommandResponse atResponse = AtCommandResponse();
+
+void sendAtCommand() {
+  Serial.println("Sending command to the XBee");
+
+  // Send the AT Command
+  xbee.send(atRequest);
+
+  // Wait up to 5 seconds for the status response
+  if (xbee.readPacket(5000)) {
+    // Got a response!
+
+    // Should be an AT command response
+    if (xbee.getResponse().getApiId() == AT_COMMAND_RESPONSE) {
+      xbee.getResponse().getAtCommandResponse(atResponse);
+
+      if (atResponse.isOk()) {
+        Serial.print("Command [");
+        Serial.print(atResponse.getCommand()[0]);
+        Serial.print(atResponse.getCommand()[1]);
+        Serial.println("] was successful!");
+
+        if (atResponse.getValueLength() > 0) {
+          Serial.print("Command value length is ");
+          Serial.println(atResponse.getValueLength(), DEC);
+
+          Serial.print("Command value: ");
+
+          for (int i = 0; i < atResponse.getValueLength(); i++) {
+            Serial.print(atResponse.getValue()[i], HEX);
+            Serial.print(" ");
+          }
+
+          Serial.println(" ");
+        }
+      } else {
+        Serial.print("Command return error code: ");
+        Serial.println(atResponse.getStatus(), HEX);
+      }
+    } else {
+      Serial.print("Expected AT response but got ");
+      Serial.println(xbee.getResponse().getApiId(), HEX);
+    }
+  } else {
+    // AT Command failed
+    if (xbee.getResponse().isError()) {
+      Serial.print("Error reading packet.  Error code: ");
+      Serial.println(xbee.getResponse().getErrorCode());
+    } else {
+      Serial.print("No response from radio");
+    }
+  }
+}
+
+void sendTx(uint8_t* payload, size_t payloadSize) {
   Tx64Request tx = Tx64Request(addr64, payload, payloadSize);
   xbee.send(tx);
   xbee.readPacket();
 
-  // after sending a tx request, we expect a status response
-  // wait up for the status response
+  // After sending a tx request, we expect a status response
+  // Wait up for the status response
   if (xbee.readPacket(1000)) {
-    // got a response!
+    // Got a response!
     Serial.println("got a response");
-    // should be a znet tx status
+    // Should be a znet tx status
     if (xbee.getResponse().getApiId() == TX_STATUS_RESPONSE) {
       xbee.getResponse().getTxStatusResponse(txStatus);
       Serial.println("response");
-      // get the delivery status, the fifth byte
+      // Get the delivery status, the fifth byte
       if (txStatus.getStatus() == SUCCESS) {
-        // success.  time to celebrate
+        // Success.  time to celebrate
         Serial.println("Success");
       } else {
-        // the remote XBee did not receive our packet. is it powered on?
+        // The remote XBee did not receive our packet. is it powered on?
         Serial.println("Failed");
       }
     }
@@ -77,7 +138,7 @@ void sendtx(uint8_t* payload, size_t payloadSize) {
   }
 }
 
-String ConvertToHexArray(String& data) {
+String convertToHexArray(String& data) {
   String hexArray = "";
 
   for (size_t i = 0; i < data.length(); ++i) {
@@ -94,44 +155,30 @@ String ConvertToHexArray(String& data) {
   return hexArray;
 }
 
-String get_sensor_data() {
-  Light_Data = TSL2561.readVisibleLux();
-  Temp_Data = bmp.readTemperature();
-  Alti_Data = bmp.readAltitude(1013.25);  /* Adjusted to local forecast! */
-  Pres_Data = bmp.readPressure();
-  Bat_Val = analogRead(Bat_Pin);
-  Bat_Val = (-0.0000004 * pow(Bat_Val, 3) + 0.0007 * pow(Bat_Val, 2) - 0.2017 * Bat_Val - 0.1125) + 0.11;
+String getSensorData() {
+  lightData = TSL2561.readVisibleLux();
+  tempData = bmp.readTemperature();
+  altiData = bmp.readAltitude(1013.25);  // Adjust to local forecast!
+  presData = bmp.readPressure();
+  batData = analogRead(BAT_PIN);
+  batData = (-0.0000004 * pow(batData, 3) + 0.0007 * pow(batData, 2) - 0.2017 * batData - 0.1125) + 0.11;
 
-  if (isnan(Light_Data)) {
-    Light_Data = 0;
-  }
+  if (isnan(lightData)) lightData = 0;
+  if (isnan(tempData)) tempData = 0;
+  if (isnan(altiData)) altiData = 0;
+  if (isnan(presData)) presData = 0;
+  if (isnan(batData)) batData = 0;
 
-  if (isnan(Temp_Data)) {
-    Temp_Data = 0;
-  }
-
-  if (isnan(Alti_Data)) {
-    Alti_Data = 0;
-  }
-
-  if (isnan(Pres_Data)) {
-    Pres_Data = 0;
-  }
-
-  if (isnan(Bat_Val)) {
-    Bat_Val = 0;
-  }
-
-  String data = "Light:" + String(Light_Data)
-                + ",Temperature:" + String(Temp_Data)
-                + ",Altitude:" + String(Alti_Data)
-                + ",Pressure:" + String(Pres_Data)
-                + ",Battery:" + String(Bat_Val);
+  String data = "Light:" + String(lightData)
+                + ",Temperature:" + String(tempData)
+                + ",Altitude:" + String(altiData)
+                + ",Pressure:" + String(presData)
+                + ",Battery:" + String(batData);
 
   return data;
 }
 
-String print_sensor_data(String data) {
+String printSensorData(String data) {
   currentTime2 = millis();
 
   size_t startIdx = 0;
@@ -150,40 +197,39 @@ String print_sensor_data(String data) {
     String value = data.substring(startIdx, endIdx);
 
     if (param.equals("Light")) {
-      Light_Data = value.toFloat();
+      lightData = value.toFloat();
     } else if (param.equals("Temperature")) {
-      Temp_Data = value.toFloat();
+      tempData = value.toFloat();
     } else if (param.equals("Altitude")) {
-      Alti_Data = value.toFloat();
+      altiData = value.toFloat();
     } else if (param.equals("Pressure")) {
-      Pres_Data = value.toFloat();
+      presData = value.toFloat();
     } else if (param.equals("Battery")) {
-      Bat_Val = value.toFloat();
+      batData = value.toFloat();
     }
 
     startIdx = endIdx + 1;
   }
 
-  if (currentTime2 - previousTime2 >= 5000) {
-
+  if (currentTime2 - previousTime2 >= PRINT_DURATION) {
     Serial.print("Battery Percentage: ");
-    Serial.print(Bat_Val);
+    Serial.print(batData);
     Serial.println("%");
 
     Serial.print(F("Temperature = "));
-    Serial.print(Temp_Data);
+    Serial.print(tempData);
     Serial.println(" *C");
 
     Serial.print(F("Pressure = "));
-    Serial.print(Pres_Data);
+    Serial.print(presData);
     Serial.println(" Pa");
 
     Serial.print(F("Approx altitude = "));
-    Serial.print(Alti_Data);
+    Serial.print(altiData);
     Serial.println(" m");
 
     Serial.print("The Light intensity is: ");
-    Serial.print(Light_Data);
+    Serial.print(lightData);
     Serial.println(" Lux");
     Serial.println();
 
@@ -195,7 +241,7 @@ String print_sensor_data(String data) {
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(sleep_trig, OUTPUT);
+  pinMode(SLEEP_TRIG_PIN, OUTPUT);
 
   xbee.setSerial(SoftSerial);
   Wire.begin();
@@ -222,12 +268,17 @@ void setup() {
   delay(500);
   digitalWrite(LED_BUILTIN, HIGH);
   delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(1000);
+  sendAtCommand();
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(3000);
 }
 
 void loop() {
-  //////////////////////////////////////////////////////////////////////////////////////
-  sensor_data = get_sensor_data();
-  hexArray = ConvertToHexArray(sensor_data);
+  // Continuously getting the sensor data and convert it into Hex format
+  sensor_data = getSensorData();
+  hexArray = convertToHexArray(sensor_data);
 
   // Convert hexArray to uint8_t array
   uint8_t payload[hexArray.length() / 3];  // 3 characters in hexArray represent one byte
@@ -235,37 +286,37 @@ void loop() {
     payload[j] = strtol(hexArray.substring(i, i + 2).c_str(), NULL, 16);
   }
   payloadSize = sizeof(payload) / sizeof(payload[0]);
-  ///////////////////////////////////////////////////////////////////////////////////////
 
   currentTime = millis();
-  if (State == false && currentTime - previousTime >= offDuration) {
+  if (!state && currentTime - previousTime >= OFF_DURATION) {
     // Turn on the state if it's currently off and the off duration has passed
     Serial.println("LED IS ON");
 
-    State = true;
-    sendtx_flag = false;
-    digitalWrite(sleep_trig, State);
+    state = true;
+    sendTxFlag = false;
+    digitalWrite(SLEEP_TRIG_PIN, state);
     previousTime = currentTime;
-  } else if (State == true && currentTime - previousTime >= onDuration) {
+  } else if (state && currentTime - previousTime >= ON_DURATION) {
     // Turn off the state if it's currently on and the on duration has passed
     Serial.println("LED IS OFF");
 
-    State = false;
-    digitalWrite(sleep_trig, State);
+    state = false;
+    digitalWrite(SLEEP_TRIG_PIN, state);
     previousTime = currentTime;
 
-    unsigned long sendtxperiod = currentTime;
-    while (currentTime - sendtxperiod < 5000) {
+    unsigned long sendTxPeriod = currentTime;
+
+    while (currentTime - sendTxPeriod < SEND_TX_PERIOD) {
       // Execute sendtx() only if it hasn't been executed during the off period
       delay(1000);
-      if (!sendtx_flag) {
+      if (!sendTxFlag) {
         Serial.println("Sending Packet!");
-        sendtx(payload, payloadSize);
-        sendtx_flag = true;  // Set the flag to true once sendtx() is executed
+        sendTx(payload, payloadSize);
+        sendTxFlag = true;  // Set the flag to true once sendtx() is executed
       }
       currentTime = millis();
     }
   }
 
-  print_sensor_data(sensor_data);
+  printSensorData(sensor_data);
 }
