@@ -20,6 +20,7 @@ const int OFF_DURATION = 5000;
 const int SEND_TX_PERIOD = 5000;
 const int PRINT_DURATION = 5000;
 
+// Initialize Global Variables
 float lightData = 0;
 float tempData = 0;
 float altiData = 0;
@@ -29,12 +30,13 @@ float batData = 0;
 String sensor_data;
 String hexArray;
 size_t payloadSize;
-
-bool state = false;
-bool sendTxFlag = false;
+uint8_t* payload;
 
 uint8_t ssRX = 0;
 uint8_t ssTX = 1;
+
+bool state = false;
+bool sendTxFlag = false;
 
 unsigned long previousTime;
 unsigned long previousTime2;
@@ -239,6 +241,48 @@ String printSensorData(String data) {
   return "";
 }
 
+void handleSleepState(uint8_t* payload, size_t payloadSize) {
+  currentTime = millis();
+  if (!state && currentTime - previousTime >= OFF_DURATION) {
+    state = true;
+    sendTxFlag = false;
+    digitalWrite(SLEEP_TRIG_PIN, state);
+    previousTime = currentTime;
+  } else if (state && currentTime - previousTime >= ON_DURATION) {
+    state = false;
+    digitalWrite(SLEEP_TRIG_PIN, state);
+    previousTime = currentTime;
+
+    unsigned long sendTxPeriod = currentTime;
+
+    while (currentTime - sendTxPeriod < SEND_TX_PERIOD) {
+      // Execute sendtx() only if it hasn't been executed during the off period
+      delay(1000);
+      if (!sendTxFlag) {
+        Serial.println("Sending Packet!");
+        sendTx(payload, payloadSize);
+        sendTxFlag = true;  // Set the flag to true once sendtx() is executed
+      }
+      currentTime = millis();
+    }
+  }
+}
+
+void convertSensorDataToPayload() {
+  sensor_data = getSensorData();
+
+  // Convert sensor_data to Hex format
+  hexArray = convertToHexArray(sensor_data);
+
+  // Convert hexArray to uint8_t array
+  payloadSize = hexArray.length() / 3; // 3 characters in hexArray represent one byte
+  payload = new uint8_t[payloadSize];
+
+  for (size_t i = 0, j = 0; i < hexArray.length(); i += 3, ++j) {
+    payload[j] = strtol(hexArray.substring(i, i + 2).c_str(), NULL, 16);
+  }
+}
+
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(SLEEP_TRIG_PIN, OUTPUT);
@@ -270,53 +314,18 @@ void setup() {
   delay(500);
   digitalWrite(LED_BUILTIN, LOW);
   delay(1000);
+
+  // Send the AT Command to reset the XBee device during the initialization
   sendAtCommand();
   digitalWrite(LED_BUILTIN, HIGH);
   delay(3000);
 }
 
 void loop() {
-  // Continuously getting the sensor data and convert it into Hex format
-  sensor_data = getSensorData();
-  hexArray = convertToHexArray(sensor_data);
-
-  // Convert hexArray to uint8_t array
-  uint8_t payload[hexArray.length() / 3];  // 3 characters in hexArray represent one byte
-  for (size_t i = 0, j = 0; i < hexArray.length(); i += 3, ++j) {
-    payload[j] = strtol(hexArray.substring(i, i + 2).c_str(), NULL, 16);
-  }
-  payloadSize = sizeof(payload) / sizeof(payload[0]);
-
-  currentTime = millis();
-  if (!state && currentTime - previousTime >= OFF_DURATION) {
-    // Turn on the state if it's currently off and the off duration has passed
-    Serial.println("LED IS ON");
-
-    state = true;
-    sendTxFlag = false;
-    digitalWrite(SLEEP_TRIG_PIN, state);
-    previousTime = currentTime;
-  } else if (state && currentTime - previousTime >= ON_DURATION) {
-    // Turn off the state if it's currently on and the on duration has passed
-    Serial.println("LED IS OFF");
-
-    state = false;
-    digitalWrite(SLEEP_TRIG_PIN, state);
-    previousTime = currentTime;
-
-    unsigned long sendTxPeriod = currentTime;
-
-    while (currentTime - sendTxPeriod < SEND_TX_PERIOD) {
-      // Execute sendtx() only if it hasn't been executed during the off period
-      delay(1000);
-      if (!sendTxFlag) {
-        Serial.println("Sending Packet!");
-        sendTx(payload, payloadSize);
-        sendTxFlag = true;  // Set the flag to true once sendtx() is executed
-      }
-      currentTime = millis();
-    }
-  }
-
+  convertSensorDataToPayload();
+  handleSleepState(payload, payloadSize);
   printSensorData(sensor_data);
+
+  // Clean up allocated memory
+  delete[] payload;
 }
