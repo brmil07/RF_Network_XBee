@@ -316,6 +316,7 @@ void blinkLED() {
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(SLEEP_TRIG_PIN, OUTPUT);
+  pinMode(BAT_PIN, INPUT);
 
   xbee.setSerial(SoftSerial);
   Wire.begin();
