@@ -17,6 +17,7 @@ const int BAT_PIN = 38;
 uint8_t ssRX = 0;
 uint8_t ssTX = 1;
 int ledPin = 13;
+int batAnalog = 0;
 float batData = 0.00;
 
 void blinkLED() {
@@ -34,6 +35,15 @@ void blinkLED() {
   digitalWrite(LED_BUILTIN, LOW);
   delay(500);
   digitalWrite(LED_BUILTIN, HIGH);
+}
+
+double polynomial(double x) {
+  double a = -0.00003481427;
+  double b = 0.09863429;
+  double c = -92.25270;
+  double d = 28521.622;
+
+  return a * pow(x, 3) + b * pow(x, 2) + c * x + d;
 }
 
 void setup() {
@@ -72,15 +82,24 @@ void loop() {
   Serial.print("The Light intensity is: ");
   Serial.println(TSL2561.readVisibleLux());
 
-  batData = analogRead(BAT_PIN);
-  batData = (-0.0000004 * pow(batData, 3) + 0.0007 * pow(batData, 2) - 0.2017 * batData - 0.1125) + 0.11;
-  if (isnan(batData)) batData = 0;
+  batAnalog = analogRead(BAT_PIN);
   
-  Serial.print("Battery Percentage: ");
+  if (batAnalog > 1022){
+    batData = 100.00;
+  }
+  else if (batAnalog < 887) {
+    batData = 0.00;
+  } else {
+    batData = polynomial(batAnalog);
+  }
+  
+  Serial.print("Analog Value: ");
+  Serial.print(batAnalog);
+  Serial.print(" ;Battery Percentage: ");
   Serial.print(batData);
   Serial.println("%");
 
-  delay(5000);
+  delay(1000);
 
   Serial.println();
 }
