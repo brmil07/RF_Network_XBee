@@ -61,6 +61,15 @@ uint8_t idCmd[] = { 'F', 'R' };  // AT Command 'FR' is for software reset
 AtCommandRequest atRequest = AtCommandRequest(idCmd);
 AtCommandResponse atResponse = AtCommandResponse();
 
+double polynomial(double x) {
+  double a = -0.00003481427;
+  double b = 0.09863429;
+  double c = -92.25270;
+  double d = 28521.622;
+
+  return a * pow(x, 3) + b * pow(x, 2) + c * x + d;
+}
+
 void sendAtCommand() {
   Serial.println("Sending command to the XBee");
 
@@ -162,8 +171,15 @@ String getSensorData() {
   tempData = bmp.readTemperature();
   altiData = bmp.readAltitude(1013.25);  // Adjust to local forecast!
   presData = bmp.readPressure();
-  batData = analogRead(BAT_PIN);
-  batData = (-0.0000004 * pow(batData, 3) + 0.0007 * pow(batData, 2) - 0.2017 * batData - 0.1125) + 0.11;
+  int batAnalog = analogRead(BAT_PIN);
+
+  if (batAnalog > 1022) {
+    batData = 100.00;
+  } else if (batAnalog < 887) {
+    batData = 0.00;
+  } else {
+    batData = polynomial(batAnalog);
+  }
 
   if (isnan(lightData)) lightData = 0;
   if (isnan(tempData)) tempData = 0;
@@ -275,7 +291,7 @@ void convertSensorDataToPayload() {
   hexArray = convertToHexArray(sensor_data);
 
   // Convert hexArray to uint8_t array
-  payloadSize = hexArray.length() / 3; // 3 characters in hexArray represent one byte
+  payloadSize = hexArray.length() / 3;  // 3 characters in hexArray represent one byte
   payload = new uint8_t[payloadSize];
 
   for (size_t i = 0, j = 0; i < hexArray.length(); i += 3, ++j) {
@@ -285,7 +301,7 @@ void convertSensorDataToPayload() {
 
 void allocatePayload() {
   hexArray = convertToHexArray(sensor_data);
-  payloadSize = hexArray.length() / 3; // 3 characters in hexArray represent one byte
+  payloadSize = hexArray.length() / 3;  // 3 characters in hexArray represent one byte
   payload = new uint8_t[payloadSize];
 
   for (size_t i = 0, j = 0; i < hexArray.length(); i += 3, ++j) {
@@ -338,7 +354,7 @@ void setup() {
   sendAtCommand();
   delay(3000);
   digitalWrite(LED_BUILTIN, HIGH);
-  
+
   // Allocate payload memory once during setup
   allocatePayload();
 }
