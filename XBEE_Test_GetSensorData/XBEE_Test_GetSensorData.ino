@@ -95,7 +95,7 @@ void loop() {
   
   Serial.print("Analog Value: ");
   Serial.print(batAnalog);
-  Serial.print(" ;Battery Percentage: ");
+  Serial.print("; Battery Percentage: ");
   Serial.print(batData);
   Serial.println("%");
 
