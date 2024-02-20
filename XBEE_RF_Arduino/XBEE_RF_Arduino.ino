@@ -175,6 +175,10 @@ String getSensorData() {
   int batAnalog = analogRead(BAT_PIN);
 
   if (lightData < 0) lightData = 0;
+<<<<<<< HEAD
+=======
+  if (tempData < 0) tempData = 0;
+>>>>>>> 98e71a700b09ab113427832eda8b945b16d4de69
   if (presData < 0) presData = 0;
 
   if (batAnalog >= 1022) {
