@@ -16,7 +16,7 @@
 const int BAT_PIN = 38;
 const int SLEEP_TRIG_PIN = 33;
 const int ON_DURATION = 10000;
-const int OFF_DURATION = 5000;
+const int OFF_DURATION = 20000;
 const int SEND_TX_PERIOD = 5000;
 const int PRINT_DURATION = 5000;
 
@@ -26,6 +26,7 @@ float tempData = 0;
 float altiData = 0;
 float presData = 0;
 float batData = 0;
+float atmValue = 1014.80; // Adjust the atmospheric pressure value to local forecast, standard atm is 1013.25 millibars
 
 String sensor_data;
 String hexArray;
@@ -169,13 +170,11 @@ String convertToHexArray(String& data) {
 String getSensorData() {
   lightData = TSL2561.readVisibleLux();
   tempData = bmp.readTemperature();
-  altiData = bmp.readAltitude(1013.25);  // Adjust to local forecast!
   presData = bmp.readPressure();
+  altiData = bmp.readAltitude(atmValue);
   int batAnalog = analogRead(BAT_PIN);
 
   if (lightData < 0) lightData = 0;
-  if (tempData < 0) tempData = 0;
-  if (altiData < 0) altiData = 0;
   if (presData < 0) presData = 0;
 
   if (batAnalog >= 1022) {
