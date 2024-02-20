@@ -62,10 +62,10 @@ AtCommandRequest atRequest = AtCommandRequest(idCmd);
 AtCommandResponse atResponse = AtCommandResponse();
 
 double polynomial(double x) {
-  double a = -0.00003481427;
-  double b = 0.09863429;
-  double c = -92.25270;
-  double d = 28521.622;
+  double a = -0.00003427440;
+  double b = 0.09678930;
+  double c = -90.21995;
+  double d = 27790.39;
 
   return a * pow(x, 3) + b * pow(x, 2) + c * x + d;
 }
@@ -173,9 +173,14 @@ String getSensorData() {
   presData = bmp.readPressure();
   int batAnalog = analogRead(BAT_PIN);
 
-  if (batAnalog > 1022) {
+  if (lightData < 0) lightData = 0;
+  if (tempData < 0) tempData = 0;
+  if (altiData < 0) altiData = 0;
+  if (presData < 0) presData = 0;
+
+  if (batAnalog >= 1022) {
     batData = 100.00;
-  } else if (batAnalog < 887) {
+  } else if (batAnalog <= 892) {
     batData = 0.00;
   } else {
     batData = polynomial(batAnalog);
@@ -332,7 +337,7 @@ void blinkLED() {
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(SLEEP_TRIG_PIN, OUTPUT);
-  pinMode(BAT_PIN, INPUT);
+  pinMode(BAT_PIN, INPUT_PULLDOWN);
 
   xbee.setSerial(SoftSerial);
   Wire.begin();
@@ -357,6 +362,7 @@ void setup() {
 
   // Allocate payload memory once during setup
   allocatePayload();
+  Serial.println();
 }
 
 void loop() {
