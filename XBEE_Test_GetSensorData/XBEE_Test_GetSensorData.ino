@@ -59,7 +59,7 @@ void setup() {
                   Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
 
   pinMode(ledPin, OUTPUT);
-  pinMode(BAT_PIN, INPUT);
+  pinMode(BAT_PIN, INPUT_PULLDOWN);
   Serial.begin(115200);
 
   blinkLED();
